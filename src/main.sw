@@ -6,6 +6,7 @@ use interface::{
     Loan,
     LoanCancelledEvent,
     LoanFilledEvent,
+    LoanLiquidatedEvent,
     LoanRepaidEvent,
     LoanRequestedEvent,
     P2PMarket,
@@ -117,6 +118,7 @@ impl P2PMarket for Contract {
         let amount_to_lender = loan.repayment_amount - protocol_fee;
         // status is 3 i.e repaid ref (enum at interface)
         loan.status = 3;
+        storage.loans.insert(loan_id, loan);
         let amount = msg_amount();
         let asset_id: b256 = msg_asset_id().into();
         require(asset_id == loan.asset, Error::EInvalidAsset);
@@ -138,8 +140,38 @@ impl P2PMarket for Contract {
             lender: loan.lender,
         });
     }
+
     #[storage(read, write)]
-    fn liquidate_loan(loan_id: u64) {}
+    fn liquidate_loan(loan_id: u64) {
+        let mut loan = storage.loans.get(loan_id).read();
+        // loan must be active
+        require(loan.status == 2, Error::EInvalidStatus);
+        // Can be liquidated after duration
+        require(
+            timestamp() > loan.start_timestamp + loan.duration,
+            Error::EDurationNotFinished,
+        );
+
+        // TODO: calculate protocol fee
+        let protocol_fee = 0;
+        // TODO: calculate liquidator fee
+        let liquidator_amount = 0;
+        let lender_amount = loan.collateral_amount - liquidator_amount - protocol_fee;
+
+        loan.status = 4;
+        storage.loans.insert(loan_id, loan);
+        let collateral_asset_id: AssetId = AssetId::from(loan.collateral);
+        let lender_identity: Identity = Identity::Address(loan.lender);
+        transfer(lender_identity, collateral_asset_id, lender_amount);
+        transfer(msg_sender().unwrap(), collateral_asset_id, liquidator_amount);
+        // TODO: transfer to protocol fee receipient
+        log(LoanLiquidatedEvent {
+            loan_id,
+            borrower: loan.borrower,
+            lender: loan.lender,
+            collateral_amount: loan.collateral_amount,
+        });
+    }
 }
 fn get_caller_address() -> Address {
     match msg_sender().unwrap() {

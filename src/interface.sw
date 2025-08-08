@@ -42,6 +42,7 @@ pub enum Error {
     EInvalidCollateralAmount: (),
     EInvalidAsset: (),
     EInvalidAssetAmount: (),
+    EDurationNotFinished: (),
 }
 
 pub struct LoanRequestedEvent {
@@ -64,6 +65,13 @@ pub struct LoanRepaidEvent {
     pub loan_id: u64,
     pub borrower: Address,
     pub lender: Address,
+}
+
+pub struct LoanLiquidatedEvent {
+    pub loan_id: u64,
+    pub borrower: Address,
+    pub lender: Address,
+    pub collateral_amount: u64,
 }
 
 abi P2PMarket {
