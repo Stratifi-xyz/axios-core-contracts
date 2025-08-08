@@ -1,0 +1,7 @@
+[project]
+authors = ["xavek@stratifi"]
+entry = "main.sw"
+license = "Apache-2.0"
+name = "stratifi-fuel-core"
+
+[dependencies]
