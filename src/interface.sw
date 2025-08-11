@@ -7,7 +7,7 @@ pub enum Status {
     Repaid: u8, // 3
     Liquidated: u8, //4
 }
-
+// not used for fixed rate
 pub struct Liquidation {
     pub is_liquidatable: bool,
     pub liquidation_threshold: u64,
@@ -27,14 +27,13 @@ pub struct Loan {
     pub start_timestamp: u64,
     pub duration: u64,
     pub status: u64,
-    pub liquidation: Liquidation,
 }
 
 pub enum Error {
     EMsgSenderAndBorrowerNotSame: (),
     EAmountLessThanOrEqualToRepaymentAmount: (),
     ESameAssetSameCollateral: (),
-    EInvalidLiqThreshold: (),
+    EInvalidDuration: (),
     EInvalidDecimal: (),
     EInvalidStatus: (),
     EAlreadyExpired: (),
@@ -75,7 +74,7 @@ pub struct LoanLiquidatedEvent {
 }
 
 abi P2PMarket {
-    #[storage(read, write)]
+    #[payable, storage(read, write)]
     fn request_loan(loan_info: Loan);
     #[storage(read, write)]
     fn cancel_loan(loan_id: u64);

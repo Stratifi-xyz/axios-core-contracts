@@ -24,7 +24,7 @@ storage {
     loan_length: u64 = 0,
 }
 impl P2PMarket for Contract {
-    #[storage(read, write)]
+    #[payable, storage(read, write)]
     fn request_loan(loan_info: Loan) {
         require(
             Identity::Address(loan_info.borrower) == msg_sender()
@@ -37,22 +37,22 @@ impl P2PMarket for Contract {
                 .asset_amount,
             Error::EAmountLessThanOrEqualToRepaymentAmount,
         );
-        require(
-            loan_info
-                .liquidation
-                .liquidation_threshold <= 10000,
-            Error::EInvalidLiqThreshold,
-        );
+        require(loan_info.duration > 0, Error::EInvalidDuration);
         require(
             loan_info
                 .asset != loan_info
                 .collateral,
             Error::ESameAssetSameCollateral,
         );
-        // TODO: check how to get decimals of assetId ideal of both native and src-20
-        // require(decimals(loan_info.asset) > 0, Error::EInvalidDecimal);
-        // require(decimals(loan_info.collateral) > 0, Error::EInvalidDecimal);
-        // TODO: After oracle addition add checks for oracle decimals
+
+        let amount = msg_amount();
+        let asset_id: b256 = msg_asset_id().into();
+        require(asset_id == loan_info.collateral, Error::EInvalidCollateral);
+        require(
+            amount == loan_info
+                .collateral_amount,
+            Error::EInvalidCollateralAmount,
+        );
         let mut loan: Loan = loan_info;
         loan.created_timestamp = timestamp();
         loan.start_timestamp = 0;
@@ -77,11 +77,19 @@ impl P2PMarket for Contract {
         );
         loan.status = 1;
         storage.loans.insert(loan_id, loan);
+        let collateral_asset_id: AssetId = AssetId::from(loan.collateral);
+        transfer(
+            msg_sender()
+                .unwrap(),
+            collateral_asset_id,
+            loan.collateral_amount,
+        );
         log(LoanCancelledEvent {
             borrower: loan.borrower,
             loan_id,
         });
     }
+
     #[payable, storage(read, write)]
     fn fill_loan_request(loan_id: u64) {
         let mut loan = storage.loans.get(loan_id).read();
@@ -163,7 +171,12 @@ impl P2PMarket for Contract {
         let collateral_asset_id: AssetId = AssetId::from(loan.collateral);
         let lender_identity: Identity = Identity::Address(loan.lender);
         transfer(lender_identity, collateral_asset_id, lender_amount);
-        transfer(msg_sender().unwrap(), collateral_asset_id, liquidator_amount);
+        transfer(
+            msg_sender()
+                .unwrap(),
+            collateral_asset_id,
+            liquidator_amount,
+        );
         // TODO: transfer to protocol fee receipient
         log(LoanLiquidatedEvent {
             loan_id,
