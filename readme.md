@@ -30,9 +30,10 @@ Loans are subject to liquidation under one conditions:
 
 ### Fee Structure
 
-- **Protocol Fee**: Applied only to interest portion (repayment amount - borrowed amount)
+- **Protocol Fee**: Applied only to interest portion (repayment amount - borrowed amount) i.e 10%
 - **Liquidation Rewards**:
-  - TBD
+  - 1% of collateral amount to liquidator
+  - 1% of collateral to protocol
 
 ## How It Works
 
