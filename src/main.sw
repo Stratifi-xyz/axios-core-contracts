@@ -22,9 +22,9 @@ use std::asset::*;
 
 // would be set while deployment as well
 configurable {
-    PROTOCOL_FEE: u64 = 10000,
-    PROTOCOL_LIQUIDATION_FEE: u64 = 100,
-    LIQUIDATOR_FEE: u64 = 100,
+    PROTOCOL_FEE: u64 = 1000, // 10%
+    PROTOCOL_LIQUIDATION_FEE: u64 = 100, // 1%
+    LIQUIDATOR_FEE: u64 = 100, // 1%
     PROTOCOL_FEE_RECEIVER: Address = Address::from(0x0000000000000000000000000000000000000000000000000000000000000000),
 }
 
