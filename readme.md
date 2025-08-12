@@ -14,7 +14,6 @@ Users can create loan requests by specifying:
 - **Repayment Amount**: Total amount to be repaid (includes interest)
 - **Collateral Amount**: Security deposit required
 - **Duration**: Loan term length
-- **Liquidation Settings**: Whether the loan can be liquidated if it becomes undercollateralized
 
 ### Loan Management
 

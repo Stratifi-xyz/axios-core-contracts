@@ -9,7 +9,7 @@ use interface::{
     LoanLiquidatedEvent,
     LoanRepaidEvent,
     LoanRequestedEvent,
-    P2PMarket,
+    FixedMarket,
     Status,
 };
 
@@ -19,11 +19,21 @@ use std::logging::log;
 use std::context::msg_amount;
 use std::call_frames::msg_asset_id;
 use std::asset::*;
+
+// would be set while deployment as well
+configurable {
+    PROTOCOL_FEE: u64 = 10000,
+    PROTOCOL_LIQUIDATION_FEE: u64 = 100,
+    LIQUIDATOR_FEE: u64 = 100,
+    PROTOCOL_FEE_RECEIVER: Address = Address::from(0x0000000000000000000000000000000000000000000000000000000000000000),
+}
+
 storage {
     loans: StorageMap<u64, Loan> = StorageMap {},
     loan_length: u64 = 0,
 }
-impl P2PMarket for Contract {
+
+impl FixedMarket for Contract {
     #[payable, storage(read, write)]
     fn request_loan(loan_info: Loan) {
         require(
@@ -64,6 +74,7 @@ impl P2PMarket for Contract {
             loan_id: storage.loan_length.read() - 1,
         });
     }
+
     #[storage(read, write)]
     fn cancel_loan(loan_id: u64) {
         let mut loan = storage.loans.get(loan_id).read();
@@ -100,14 +111,11 @@ impl P2PMarket for Contract {
         loan.start_timestamp = timestamp();
         loan.status = 2; // magic number 2 is active (ref Enum at interface)
         storage.loans.insert(loan_id, loan);
-        //TODO: check if loan is instantly liquidateable and revert if: After oracle addition
+        //TODO: check if loan is instantly liquidateable and revert if:
         let amount = msg_amount();
         let asset_id: b256 = msg_asset_id().into();
-        require(asset_id == loan.collateral, Error::EInvalidCollateral);
-        require(
-            amount == loan.collateral_amount,
-            Error::EInvalidCollateralAmount,
-        );
+        require(asset_id == loan.asset, Error::EInvalidAsset);
+        require(amount == loan.asset_amount, Error::EInvalidAssetAmount);
         let asset_id: AssetId = AssetId::from(loan.asset);
         transfer(msg_sender().unwrap(), asset_id, loan.asset_amount);
         log(LoanFilledEvent {
@@ -116,14 +124,14 @@ impl P2PMarket for Contract {
             lender: get_caller_address(),
         });
     }
-    #[storage(read, write)]
+    #[payable, storage(read, write)]
     fn repay_loan(loan_id: u64) {
         let mut loan = storage.loans.get(loan_id).read();
         // loan must be active
         require(loan.status == 2, Error::EInvalidStatus);
-        // TODO: calculate Protocol fee
-        let protocol_fee = 0;
-        let amount_to_lender = loan.repayment_amount - protocol_fee;
+        let interest_in_amount: u64 = loan.repayment_amount - loan.asset_amount;
+        let protocol_fee: u64 = (interest_in_amount * PROTOCOL_FEE) / 10000;
+        let amount_to_lender: u64 = loan.repayment_amount - protocol_fee;
         // status is 3 i.e repaid ref (enum at interface)
         loan.status = 3;
         storage.loans.insert(loan_id, loan);
@@ -141,7 +149,8 @@ impl P2PMarket for Contract {
             collateral_asset_id,
             loan.collateral_amount,
         );
-        // TODO: transfer protocol fee
+        let protocol_fee_receiver_identity = Identity::Address(PROTOCOL_FEE_RECEIVER);
+        transfer(protocol_fee_receiver_identity, asset_id, protocol_fee);
         log(LoanRepaidEvent {
             loan_id,
             borrower: loan.borrower,
@@ -160,10 +169,8 @@ impl P2PMarket for Contract {
             Error::EDurationNotFinished,
         );
 
-        // TODO: calculate protocol fee
-        let protocol_fee = 0;
-        // TODO: calculate liquidator fee
-        let liquidator_amount = 0;
+        let protocol_fee = (loan.collateral_amount * PROTOCOL_LIQUIDATION_FEE) / 10000;
+        let liquidator_amount = (loan.collateral_amount * LIQUIDATOR_FEE) / 10000;
         let lender_amount = loan.collateral_amount - liquidator_amount - protocol_fee;
 
         loan.status = 4;
@@ -177,7 +184,13 @@ impl P2PMarket for Contract {
             collateral_asset_id,
             liquidator_amount,
         );
-        // TODO: transfer to protocol fee receipient
+
+        let protocol_fee_receiver_identity = Identity::Address(PROTOCOL_FEE_RECEIVER);
+        transfer(
+            protocol_fee_receiver_identity,
+            collateral_asset_id,
+            protocol_fee,
+        );
         log(LoanLiquidatedEvent {
             loan_id,
             borrower: loan.borrower,

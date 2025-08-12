@@ -73,14 +73,14 @@ pub struct LoanLiquidatedEvent {
     pub collateral_amount: u64,
 }
 
-abi P2PMarket {
+abi FixedMarket {
     #[payable, storage(read, write)]
     fn request_loan(loan_info: Loan);
     #[storage(read, write)]
     fn cancel_loan(loan_id: u64);
     #[payable, storage(read, write)]
     fn fill_loan_request(loan_id: u64);
-    #[storage(read, write)]
+    #[payable, storage(read, write)]
     fn repay_loan(loan_id: u64);
     #[storage(read, write)]
     fn liquidate_loan(loan_id: u64);
