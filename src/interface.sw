@@ -84,4 +84,10 @@ abi FixedMarket {
     fn repay_loan(loan_id: u64);
     #[storage(read, write)]
     fn liquidate_loan(loan_id: u64);
+
+    // Storage Read Function
+    #[storage(read)]
+    fn get_loan(loan_id: u64) -> Loan;
+    #[storage(read)]
+    fn get_loan_status(loan_id: u64) -> u64;
 }

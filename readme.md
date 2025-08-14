@@ -1,6 +1,12 @@
 ### Borrow and Lend Isolated Market For Fixed Rate Lending over Fuel
 
-A decentralized lending platform that enables peer-to-peer borrowing with customizable terms and automated liquidation mechanisms.
+A decentralized money market protocol that enables lending & borrowing with customizable terms and automated liquidation mechanisms.
+
+### Dev Setup
+
+```
+forc 0.69.1
+```
 
 ## Core Features
 
