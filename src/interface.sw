@@ -90,4 +90,6 @@ abi FixedMarket {
     fn get_loan(loan_id: u64) -> Loan;
     #[storage(read)]
     fn get_loan_status(loan_id: u64) -> u64;
+    #[storage(read)]
+    fn get_loan_length() -> u64;
 }

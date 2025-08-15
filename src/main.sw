@@ -216,6 +216,11 @@ impl FixedMarket for Contract {
     fn get_loan_status(loan_id: u64) -> u64 {
         storage.loans.get(loan_id).read().status
     }
+
+    #[storage(read)]
+    fn get_loan_length() -> u64 {
+        storage.loan_length.read() - 1
+    }
 }
 
 fn get_caller_address() -> Address {
