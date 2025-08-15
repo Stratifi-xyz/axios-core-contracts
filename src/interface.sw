@@ -5,10 +5,12 @@ pub enum Status {
     Canceled: u8, // 1
     Active: u8, // 2
     Repaid: u8, // 3
-    Liquidated: u8, //4
+    Liquidated: u8, // 4
+    ExpiredClaim: u8, // 5
 }
-// not used for fixed rate
+
 pub struct Liquidation {
+    pub liquidation_setting: bool,
     pub is_liquidatable: bool,
     pub liquidation_threshold: u64,
     pub asset_oracle: Address,
@@ -42,6 +44,7 @@ pub enum Error {
     EInvalidAsset: (),
     EInvalidAssetAmount: (),
     EDurationNotFinished: (),
+    ELoanReqNotExpired: (),
 }
 
 pub struct LoanRequestedEvent {
@@ -73,6 +76,12 @@ pub struct LoanLiquidatedEvent {
     pub collateral_amount: u64,
 }
 
+pub struct ClaimExpiredLoanReqEvent {
+    pub loan_id: u64,
+    pub borrower: Address,
+    pub amount: u64,
+}
+
 abi FixedMarket {
     #[payable, storage(read, write)]
     fn request_loan(loan_info: Loan);
@@ -84,6 +93,8 @@ abi FixedMarket {
     fn repay_loan(loan_id: u64);
     #[storage(read, write)]
     fn liquidate_loan(loan_id: u64);
+    #[storage(read, write)]
+    fn claim_expired_loan_req(loan_id: u64);
 
     // Storage Read Function
     #[storage(read)]

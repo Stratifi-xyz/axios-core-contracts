@@ -2,6 +2,7 @@ contract;
 
 mod interface;
 use interface::{
+    ClaimExpiredLoanReqEvent,
     Error,
     FixedMarket,
     Loan,
@@ -27,7 +28,6 @@ configurable {
     LIQUIDATOR_FEE: u64 = 100,
     PROTOCOL_FEE_RECEIVER: Address = Address::from(0x0000000000000000000000000000000000000000000000000000000000000000),
     TIME_REQUEST_LOAN_GETS_EXPIRED: u64 = 28800,
-    TIME_AFTER_REQUEST_LOAN_CAN_CANCELLED: u64 = 18800,
 }
 
 storage {
@@ -83,7 +83,7 @@ impl FixedMarket for Contract {
         let mut loan = storage.loans.get(loan_id).read();
         require(loan.status == 0, Error::EInvalidStatus);
         require(
-            loan.created_timestamp + TIME_AFTER_REQUEST_LOAN_CAN_CANCELLED > timestamp(),
+            loan.created_timestamp + TIME_REQUEST_LOAN_GETS_EXPIRED > timestamp(),
             Error::EAlreadyExpired,
         );
         require(
@@ -103,6 +103,35 @@ impl FixedMarket for Contract {
         log(LoanCancelledEvent {
             borrower: loan.borrower,
             loan_id,
+        });
+    }
+
+    #[storage(read, write)]
+    fn claim_expired_loan_req(loan_id: u64) {
+        let mut loan = storage.loans.get(loan_id).read();
+        require(loan.status == 0, Error::EInvalidStatus);
+        require(
+            timestamp() > loan.created_timestamp + TIME_REQUEST_LOAN_GETS_EXPIRED,
+            Error::ELoanReqNotExpired,
+        );
+        require(
+            Identity::Address(loan.borrower) == msg_sender()
+                .unwrap(),
+            Error::EMsgSenderAndBorrowerNotSame,
+        );
+        loan.status = 5;
+        storage.loans.insert(loan_id, loan);
+        let collateral_asset_id: AssetId = get_asset_id_from_b256(loan.collateral);
+        transfer(
+            msg_sender()
+                .unwrap(),
+            collateral_asset_id,
+            loan.collateral_amount,
+        );
+        log(ClaimExpiredLoanReqEvent {
+            loan_id,
+            borrower: loan.borrower,
+            amount: loan.collateral_amount,
         });
     }
 
@@ -131,6 +160,7 @@ impl FixedMarket for Contract {
             lender: get_caller_address(),
         });
     }
+
     #[payable, storage(read, write)]
     fn repay_loan(loan_id: u64) {
         let mut loan = storage.loans.get(loan_id).read();
