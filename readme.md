@@ -27,7 +27,6 @@ Users can create loan requests by specifying:
 - **Cancel Requests**: Borrowers can cancel unfilled requests
 - **Repay Loans**: Borrowers can repay active loans
 - **Auto-Expiration**: Unfilled requests automatically expire after `DURATION`
-- **Expired-Loans**: Loan requests can be expired after `DURATION` and be available for claim to borrower
 
 ### Liquidation System
 
