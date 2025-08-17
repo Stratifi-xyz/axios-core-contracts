@@ -1,5 +1,8 @@
 library;
 
+use std::bytes::Bytes;
+use pyth_interface::data_structures::price::PriceFeedId;
+
 pub enum Status {
     Pending: u8, // 0
     Canceled: u8, // 1
@@ -8,15 +11,11 @@ pub enum Status {
     Liquidated: u8, // 4
     ExpiredClaim: u8, // 5
 }
-
 pub struct Liquidation {
-    pub liquidation_setting: bool,
-    pub is_liquidatable: bool,
-    pub liquidation_threshold: u64,
-    pub asset_oracle: Address,
-    pub collateral_oracle: Address,
+    pub liquidation_request: bool,
+    pub liquidation_threshold_in_bps: u64,
+    pub liquidation_flag_internal: bool,
 }
-
 pub struct Loan {
     pub borrower: Address,
     pub lender: Address,
@@ -29,8 +28,8 @@ pub struct Loan {
     pub start_timestamp: u64,
     pub duration: u64,
     pub status: u64,
+    pub liquidation: Liquidation,
 }
-
 pub enum Error {
     EMsgSenderAndBorrowerNotSame: (),
     EAmountLessThanOrEqualToRepaymentAmount: (),
@@ -45,43 +44,43 @@ pub enum Error {
     EInvalidAssetAmount: (),
     EDurationNotFinished: (),
     ELoanReqNotExpired: (),
+    ENoOracleFeedAvailable: (),
+    EInvalidLiqThreshold: (),
+    EOracleNotSet: (),
+    EOraclePriceZero: (),
+    EOraclePriceStale: (),
+    ENotEnoughForOracleUpdate: (),
+    ENotOracleBaseAssetId: (),
 }
-
 pub struct LoanRequestedEvent {
     pub borrower: Address,
     pub loan_id: u64,
 }
-
 pub struct LoanCancelledEvent {
     pub borrower: Address,
     pub loan_id: u64,
 }
-
 pub struct LoanFilledEvent {
     pub loan_id: u64,
     pub borrower: Address,
     pub lender: Address,
 }
-
 pub struct LoanRepaidEvent {
     pub loan_id: u64,
     pub borrower: Address,
     pub lender: Address,
 }
-
 pub struct LoanLiquidatedEvent {
     pub loan_id: u64,
     pub borrower: Address,
     pub lender: Address,
     pub collateral_amount: u64,
 }
-
 pub struct ClaimExpiredLoanReqEvent {
     pub loan_id: u64,
     pub borrower: Address,
     pub amount: u64,
 }
-
 abi FixedMarket {
     #[payable, storage(read, write)]
     fn request_loan(loan_info: Loan);
@@ -95,7 +94,11 @@ abi FixedMarket {
     fn liquidate_loan(loan_id: u64);
     #[storage(read, write)]
     fn claim_expired_loan_req(loan_id: u64);
-
+    // oracle
+    #[payable, storage(read)]
+    fn pay_and_update_price_feeds(update_data: Vec<Bytes>);
+    #[storage(read)]
+    fn get_price_from_oracle(feed_id: PriceFeedId) -> u64;
     // Storage Read Function
     #[storage(read)]
     fn get_loan(loan_id: u64) -> Loan;
@@ -103,4 +106,16 @@ abi FixedMarket {
     fn get_loan_status(loan_id: u64) -> u64;
     #[storage(read)]
     fn get_loan_length() -> u64;
+    #[storage(read)]
+    fn is_loan_liquidation_by_oracle(loan_id: u64) -> bool;
+}
+
+// Only for query of decimals
+abi SRC20 {
+    #[storage(read)]
+    fn total_assets() -> u64;
+    #[storage(read)]
+    fn total_supply(asset: AssetId) -> Option<u64>;
+    #[storage(read)]
+    fn decimals(asset: AssetId) -> Option<u8>;
 }

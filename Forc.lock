@@ -1,9 +1,17 @@
 [[package]]
+name = "axios-fuel-core"
+source = "member"
+dependencies = [
+    "pyth_interface",
+    "std",
+]
+
+[[package]]
+name = "pyth_interface"
+source = "git+https://github.com/pyth-network/pyth-crosschain?rev#9f26ac575ddf116aa48d1b2367c4e6512d5e34cb"
+dependencies = ["std"]
+
+[[package]]
 name = "std"
 version = "0.69.1"
 source = "registry+std?0.69.1#QmbPunScay4xpfHKpxQ71dFKXSiyJuPP8P8YhgX5Dkmzm9!"
-
-[[package]]
-name = "stratifi-fuel-core"
-source = "member"
-dependencies = ["std"]

@@ -31,9 +31,10 @@ Users can create loan requests by specifying:
 
 ### Liquidation System
 
-Loans are subject to liquidation under one conditions:
+Loans are subject to liquidation under following conditions:
 
 1. **Time-based**: Loan duration expires without repayment
+2. **Liquidation Threshold**: When value of asset borrowed is higher than the value of collateral and liquidation threshold
 
 ### Fee Structure
 
@@ -47,4 +48,4 @@ Loans are subject to liquidation under one conditions:
 1. Borrower creates a loan request with desired terms
 2. Lender reviews and fills the request
 3. Borrower receives the asset and repays within the specified duration
-4. If conditions aren't met, the loan may be liquidated with collateral distributed to liquidator and protocol
+4. In case of liquidation, collateral is sent to lender with some parts to protocol and liquidator
