@@ -17,7 +17,6 @@ Borrower can create loan requests by specifying:
 - **Asset Token**: The token to be borrowed
 - **Asset Amount**: Amount it want to borrow
 - **Collateral Token**: The token provided as security
-- **Borrow Amount**: Quantity of asset tokens requested
 - **Repayment Amount**: Total amount to be repaid (includes interest)
 - **Collateral Amount**: Security deposit required
 - **Duration**: Loan term length
@@ -30,7 +29,6 @@ Lender can create lending offer by specifying:
 - **Asset Token**: The token to be borrowed
 - **Asset Amount**: Amount borrower can borrow
 - **Collateral Token**: The token provided as security
-- **Borrow Amount**: Quantity of asset tokens requested
 - **Repayment Amount**: Total amount to be repaid (includes interest)
 - **Collateral Amount**: Security deposit required
 - **Duration**: Loan term length
