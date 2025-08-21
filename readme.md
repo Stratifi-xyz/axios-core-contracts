@@ -12,19 +12,34 @@ forc 0.69.1
 
 ### Loan Requests
 
-Users can create loan requests by specifying:
+Borrower can create loan requests by specifying:
 
 - **Asset Token**: The token to be borrowed
+- **Asset Amount**: Amount it want to borrow
 - **Collateral Token**: The token provided as security
 - **Borrow Amount**: Quantity of asset tokens requested
 - **Repayment Amount**: Total amount to be repaid (includes interest)
 - **Collateral Amount**: Security deposit required
 - **Duration**: Loan term length
+- **Liquidation(optional)**: Borrowers can enable automatic liquidation of their loans when collateral ratios fall below specified thresholds.
+
+### Loan Offers
+
+Lender can create lending offer by specifying:
+
+- **Asset Token**: The token to be borrowed
+- **Asset Amount**: Amount borrower can borrow
+- **Collateral Token**: The token provided as security
+- **Borrow Amount**: Quantity of asset tokens requested
+- **Repayment Amount**: Total amount to be repaid (includes interest)
+- **Collateral Amount**: Security deposit required
+- **Duration**: Loan term length
+- **Liquidation(optional)**: Lenders can enable automatic liquidation of their loans when collateral ratios fall below specified thresholds. Price feeds are sourced from Pyth Network oracles.
 
 ### Loan Management
 
-- **Fill Requests**: Lenders can fulfill open loan requests
-- **Cancel Requests**: Borrowers can cancel unfilled requests
+- **Fill Requests**: Lenders can fulfill open loan requests and borrower can fulfill open loan offers
+- **Cancel Requests**: Borrowers and lenders can cancel unfilled requests
 - **Repay Loans**: Borrowers can repay active loans
 - **Auto-Expiration**: Unfilled requests automatically expire after `DURATION`
 
@@ -44,7 +59,16 @@ Loans are subject to liquidation under following conditions:
 
 ## How It Works
 
+For Borrower:
+
 1. Borrower creates a loan request with desired terms
 2. Lender reviews and fills the request
+3. Borrower receives the asset and repays within the specified duration
+4. In case of liquidation, collateral is sent to lender with some parts to protocol and liquidator
+
+For Lender:
+
+1. Lender creates a loan offer with desired terms
+2. Borrower reviews and fills the request
 3. Borrower receives the asset and repays within the specified duration
 4. In case of liquidation, collateral is sent to lender with some parts to protocol and liquidator
