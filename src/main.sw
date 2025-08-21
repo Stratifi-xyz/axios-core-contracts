@@ -1,19 +1,9 @@
 contract;
-
+mod events;
 mod interface;
-use interface::{
-    ClaimExpiredLoanReqEvent,
-    Error,
-    FixedMarket,
-    Loan,
-    LoanCancelledEvent,
-    LoanFilledEvent,
-    LoanLiquidatedEvent,
-    LoanRepaidEvent,
-    LoanRequestedEvent,
-    SRC20,
-    Status,
-};
+use interface::{Error, FixedMarket, Loan, SRC20, Status};
+
+use events::*;
 
 use pyth_interface::{data_structures::price::{Price, PriceFeedId}, PythCore};
 use std::auth::msg_sender;
@@ -101,10 +91,169 @@ impl FixedMarket for Contract {
         storage.loans.insert(storage.loan_length.read(), loan);
         storage.loan_length.write(storage.loan_length.read() + 1);
         log(LoanRequestedEvent {
-            borrower: loan_info.borrower,
             loan_id: storage.loan_length.read() - 1,
+            borrower: loan_info.borrower,
+            asset: loan_info.asset,
+            asset_amount: loan_info.asset_amount,
+            collateral: loan_info.collateral,
+            collateral_amount: loan_info.collateral_amount,
+            duration: loan_info.duration,
+            liquidation: loan.liquidation.liquidation_flag_internal,
         });
     }
+
+    #[payable, storage(read, write)]
+    fn offer_loan(loan_info: Loan) {
+        require(
+            Identity::Address(loan_info.lender) == msg_sender()
+                .unwrap(),
+            Error::EMsgSenderAndLenderNotSame,
+        );
+
+        require(
+            loan_info
+                .repayment_amount > loan_info
+                .asset_amount,
+            Error::EAmountLessThanOrEqualToRepaymentAmount,
+        );
+        // TODO: To restrict the granular orders of 1 seconds or 60 seconds. Should add minimum duration check. Indexer might dos?
+        require(loan_info.duration > 0, Error::EInvalidDuration);
+        require(
+            loan_info
+                .asset != loan_info
+                .collateral,
+            Error::ESameAssetSameCollateral,
+        );
+        if (loan_info.liquidation.liquidation_request) {
+            let oracle_contract_id = storage.pyth_contract.read();
+            require(
+                oracle_contract_id != ContractId::zero(),
+                Error::EOracleNotSet,
+            );
+            let first_pair_check: b256 = storage.oracle_config.get((loan_info.collateral, loan_info.asset)).try_read().unwrap_or(b256::zero());
+            let second_pair_check: b256 = storage.oracle_config.get((loan_info.asset, loan_info.collateral)).try_read().unwrap_or(b256::zero());
+            require(
+                first_pair_check != second_pair_check,
+                Error::ENoOracleFeedAvailable,
+            );
+            require(
+                loan_info
+                    .liquidation
+                    .liquidation_threshold_in_bps < 10000,
+                Error::EInvalidLiqThreshold,
+            );
+        }
+        let amount = msg_amount();
+        let asset_id: b256 = msg_asset_id().into();
+        require(asset_id == loan_info.asset, Error::EInvalidAsset);
+        require(amount == loan_info.asset_amount, Error::EInvalidAssetAmount);
+        let mut loan: Loan = loan_info;
+        loan.created_timestamp = timestamp();
+        loan.start_timestamp = 0;
+        loan.status = 0;
+        if (loan_info.liquidation.liquidation_request) {
+            loan.liquidation.liquidation_flag_internal = true;
+        }
+        storage.loans.insert(storage.loan_length.read(), loan);
+        storage.loan_length.write(storage.loan_length.read() + 1);
+
+        log(LoanOfferedEvent {
+            loan_id: storage.loan_length.read() - 1,
+            lender: loan_info.lender,
+            asset: loan_info.asset,
+            asset_amount: loan_info.asset_amount,
+            collateral: loan_info.collateral,
+            collateral_amount: loan_info.collateral_amount,
+            duration: loan_info.duration,
+            liquidation: loan.liquidation.liquidation_flag_internal,
+        });
+    }
+
+    #[payable, storage(read, write)]
+    fn fill_lender_request(loan_id: u64) {
+        let mut loan = storage.loans.get(loan_id).read();
+        require(loan.status == 0, Error::EInvalidStatus);
+        require(
+            loan.created_timestamp + TIME_REQUEST_LOAN_GETS_EXPIRED > timestamp(),
+            Error::EAlreadyExpired,
+        );
+        let borrower = get_caller_address();
+        loan.borrower = borrower;
+        loan.start_timestamp = timestamp();
+        loan.status = 2; // magic number 2 is active (ref Enum at interface)
+        storage.loans.insert(loan_id, loan);
+        let amount = msg_amount();
+        let asset_id: b256 = msg_asset_id().into();
+        require(asset_id == loan.collateral, Error::EInvalidCollateral);
+        require(
+            amount == loan.collateral_amount,
+            Error::EInvalidCollateralAmount,
+        );
+        let asset_id: AssetId = get_asset_id_from_b256(loan.asset);
+        let borrower_identity: Identity = get_identity_from_address(borrower);
+        transfer(borrower_identity, asset_id, loan.asset_amount);
+        log(LoanOfferFilledEvent {
+            loan_id,
+            borrower: borrower,
+            lender: loan.lender,
+            asset: loan.asset,
+            amount: loan.asset_amount,
+            duration: loan.duration,
+            liquidation: loan.liquidation.liquidation_flag_internal,
+        });
+    }
+
+    #[storage(read, write)]
+    fn cancel_lender_offer(loan_id: u64) {
+        let mut loan = storage.loans.get(loan_id).read();
+        require(loan.status == 0, Error::EInvalidStatus);
+        require(
+            loan.created_timestamp + TIME_REQUEST_LOAN_GETS_EXPIRED > timestamp(),
+            Error::EAlreadyExpired,
+        );
+        require(
+            Identity::Address(loan.lender) == msg_sender()
+                .unwrap(),
+            Error::EMsgSenderAndLenderNotSame,
+        );
+        loan.status = 1;
+        storage.loans.insert(loan_id, loan);
+        let asset_id: AssetId = get_asset_id_from_b256(loan.asset);
+        transfer(msg_sender().unwrap(), asset_id, loan.asset_amount);
+
+        log(LoanOfferedCancelledEvent {
+            loan_id,
+            lender: loan.lender,
+            asset: loan.asset,
+            amount: loan.asset_amount,
+        });
+    }
+
+    #[storage(read, write)]
+    fn claim_expired_loan_offer(loan_id: u64) {
+        let mut loan = storage.loans.get(loan_id).read();
+        require(loan.status == 0, Error::EInvalidStatus);
+        require(
+            timestamp() > loan.created_timestamp + TIME_REQUEST_LOAN_GETS_EXPIRED,
+            Error::ELoanOfferNotExpired,
+        );
+        require(
+            Identity::Address(loan.lender) == msg_sender()
+                .unwrap(),
+            Error::EMsgSenderAndLenderNotSame,
+        );
+        loan.status = 5;
+        storage.loans.insert(loan_id, loan);
+        let asset_id: AssetId = get_asset_id_from_b256(loan.asset);
+        transfer(msg_sender().unwrap(), asset_id, loan.asset_amount);
+        log(ClaimExpiredLoanOfferEvent {
+            loan_id,
+            lender: loan.lender,
+            asset: loan.asset,
+            amount: loan.asset_amount,
+        });
+    }
+
     #[storage(read, write)]
     fn cancel_loan(loan_id: u64) {
         let mut loan = storage.loans.get(loan_id).read();
@@ -128,8 +277,10 @@ impl FixedMarket for Contract {
             loan.collateral_amount,
         );
         log(LoanCancelledEvent {
-            borrower: loan.borrower,
             loan_id,
+            borrower: loan.borrower,
+            collateral: loan.collateral,
+            amount: loan.collateral_amount,
         });
     }
     #[storage(read, write)]
@@ -157,6 +308,7 @@ impl FixedMarket for Contract {
         log(ClaimExpiredLoanReqEvent {
             loan_id,
             borrower: loan.borrower,
+            collateral: loan.collateral,
             amount: loan.collateral_amount,
         });
     }
@@ -183,6 +335,9 @@ impl FixedMarket for Contract {
             loan_id,
             borrower: loan.borrower,
             lender: get_caller_address(),
+            asset: loan.asset,
+            amount: loan.asset_amount,
+            liquidation: loan.liquidation.liquidation_flag_internal,
         });
     }
     #[payable, storage(read, write)]
@@ -216,6 +371,8 @@ impl FixedMarket for Contract {
             loan_id,
             borrower: loan.borrower,
             lender: loan.lender,
+            asset: loan.asset,
+            repayment_amount: loan.repayment_amount,
         });
     }
     #[storage(read, write)]

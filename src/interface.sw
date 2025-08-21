@@ -32,6 +32,7 @@ pub struct Loan {
 }
 pub enum Error {
     EMsgSenderAndBorrowerNotSame: (),
+    EMsgSenderAndLenderNotSame: (),
     EAmountLessThanOrEqualToRepaymentAmount: (),
     ESameAssetSameCollateral: (),
     EInvalidDuration: (),
@@ -44,6 +45,7 @@ pub enum Error {
     EInvalidAssetAmount: (),
     EDurationNotFinished: (),
     ELoanReqNotExpired: (),
+    ELoanOfferNotExpired: (),
     ENoOracleFeedAvailable: (),
     EInvalidLiqThreshold: (),
     EOracleNotSet: (),
@@ -52,35 +54,7 @@ pub enum Error {
     ENotEnoughForOracleUpdate: (),
     ENotOracleBaseAssetId: (),
 }
-pub struct LoanRequestedEvent {
-    pub borrower: Address,
-    pub loan_id: u64,
-}
-pub struct LoanCancelledEvent {
-    pub borrower: Address,
-    pub loan_id: u64,
-}
-pub struct LoanFilledEvent {
-    pub loan_id: u64,
-    pub borrower: Address,
-    pub lender: Address,
-}
-pub struct LoanRepaidEvent {
-    pub loan_id: u64,
-    pub borrower: Address,
-    pub lender: Address,
-}
-pub struct LoanLiquidatedEvent {
-    pub loan_id: u64,
-    pub borrower: Address,
-    pub lender: Address,
-    pub collateral_amount: u64,
-}
-pub struct ClaimExpiredLoanReqEvent {
-    pub loan_id: u64,
-    pub borrower: Address,
-    pub amount: u64,
-}
+
 abi FixedMarket {
     #[payable, storage(read, write)]
     fn request_loan(loan_info: Loan);
@@ -94,6 +68,16 @@ abi FixedMarket {
     fn liquidate_loan(loan_id: u64);
     #[storage(read, write)]
     fn claim_expired_loan_req(loan_id: u64);
+
+    // offer loan
+    #[payable, storage(read, write)]
+    fn offer_loan(loan_info: Loan);
+    #[payable, storage(read, write)]
+    fn fill_lender_request(loan_id: u64);
+    #[storage(read, write)]
+    fn cancel_lender_offer(loan_id: u64);
+    #[storage(read, write)]
+    fn claim_expired_loan_offer(loan_id: u64);
     // oracle
     #[payable, storage(read)]
     fn pay_and_update_price_feeds(update_data: Vec<Bytes>);
