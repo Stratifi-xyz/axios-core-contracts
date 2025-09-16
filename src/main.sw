@@ -1,7 +1,7 @@
 contract;
 mod events;
 mod interface;
-use interface::{Error, FixedMarket, Loan, SRC20, Status};
+use interface::{Error, FixedMarket, Loan, ProtocolConfig, SRC20, Status};
 
 use events::*;
 
@@ -16,12 +16,7 @@ use std::bytes::Bytes;
 use std::asset::*;
 // would be set while deployment as well
 configurable {
-    PROTOCOL_FEE: u64 = 1000,
-    PROTOCOL_LIQUIDATION_FEE: u64 = 100,
-    LIQUIDATOR_FEE: u64 = 100,
-    PROTOCOL_FEE_RECEIVER: Address = Address::from(0x0000000000000000000000000000000000000000000000000000000000000000),
-    TIME_REQUEST_LOAN_GETS_EXPIRED: u64 = 28800,
-    MAX_STALENESS_SECONDS: u64 = 30,
+    PROTOCOL_OWNER: Address = Address::zero(),
 }
 
 storage {
@@ -31,10 +26,51 @@ storage {
     // (base_asset_id, quote_asset_id) -> PythFeedId
     // eg map of (eth, usdc) -> PythFeedId (underlying type is b256)
     oracle_config: StorageMap<(b256, b256), PriceFeedId> = StorageMap {},
+    protocol_config: ProtocolConfig = ProtocolConfig::default(),
+    protocol_admin: Address = Address::zero(),
+    is_paused: bool = true,
 }
 impl FixedMarket for Contract {
+    #[storage(read, write)]
+    fn add_admin(admin: Address) {
+        require(
+            PROTOCOL_OWNER == get_caller_address(),
+            Error::ENotProtocolOwner,
+        );
+        storage.protocol_admin.write(admin);
+    }
+    #[storage(read, write)]
+    fn update_protocol_config(config: ProtocolConfig) {
+        require(
+            storage
+                .protocol_admin
+                .read() == get_caller_address(),
+            Error::ENotProtocolAdmin,
+        );
+        storage.protocol_config.write(config);
+    }
+
+    #[storage(read, write)]
+    fn update_protocol_status(flag: bool) {
+        require(
+            storage
+                .protocol_admin
+                .read() == get_caller_address(),
+            Error::ENotProtocolAdmin,
+        );
+        require(
+            storage
+                .protocol_config
+                .protocol_fee
+                .read() != 0,
+            Error::EProtocolConfigNotSet,
+        );
+        storage.is_paused.write(flag);
+    }
+
     #[payable, storage(read, write)]
     fn request_loan(loan_info: Loan) {
+        require(!is_protocol_paused(), Error::EProtocolPaused);
         require(
             Identity::Address(loan_info.borrower) == msg_sender()
                 .unwrap(),
@@ -104,6 +140,7 @@ impl FixedMarket for Contract {
 
     #[payable, storage(read, write)]
     fn offer_loan(loan_info: Loan) {
+        require(!is_protocol_paused(), Error::EProtocolPaused);
         require(
             Identity::Address(loan_info.lender) == msg_sender()
                 .unwrap(),
@@ -171,10 +208,11 @@ impl FixedMarket for Contract {
 
     #[payable, storage(read, write)]
     fn fill_lender_request(loan_id: u64) {
+        require(!is_protocol_paused(), Error::EProtocolPaused);
         let mut loan = storage.loans.get(loan_id).read();
         require(loan.status == 0, Error::EInvalidStatus);
         require(
-            loan.created_timestamp + TIME_REQUEST_LOAN_GETS_EXPIRED > timestamp(),
+            loan.created_timestamp + get_req_expire_duration() > timestamp(),
             Error::EAlreadyExpired,
         );
         let borrower = get_caller_address();
@@ -205,10 +243,11 @@ impl FixedMarket for Contract {
 
     #[storage(read, write)]
     fn cancel_lender_offer(loan_id: u64) {
+        require(!is_protocol_paused(), Error::EProtocolPaused);
         let mut loan = storage.loans.get(loan_id).read();
         require(loan.status == 0, Error::EInvalidStatus);
         require(
-            loan.created_timestamp + TIME_REQUEST_LOAN_GETS_EXPIRED > timestamp(),
+            loan.created_timestamp + get_req_expire_duration() > timestamp(),
             Error::EAlreadyExpired,
         );
         require(
@@ -231,10 +270,11 @@ impl FixedMarket for Contract {
 
     #[storage(read, write)]
     fn claim_expired_loan_offer(loan_id: u64) {
+        require(!is_protocol_paused(), Error::EProtocolPaused);
         let mut loan = storage.loans.get(loan_id).read();
         require(loan.status == 0, Error::EInvalidStatus);
         require(
-            timestamp() > loan.created_timestamp + TIME_REQUEST_LOAN_GETS_EXPIRED,
+            timestamp() > loan.created_timestamp + get_req_expire_duration(),
             Error::ELoanOfferNotExpired,
         );
         require(
@@ -256,10 +296,11 @@ impl FixedMarket for Contract {
 
     #[storage(read, write)]
     fn cancel_loan(loan_id: u64) {
+        require(!is_protocol_paused(), Error::EProtocolPaused);
         let mut loan = storage.loans.get(loan_id).read();
         require(loan.status == 0, Error::EInvalidStatus);
         require(
-            loan.created_timestamp + TIME_REQUEST_LOAN_GETS_EXPIRED > timestamp(),
+            loan.created_timestamp + get_req_expire_duration() > timestamp(),
             Error::EAlreadyExpired,
         );
         require(
@@ -285,10 +326,11 @@ impl FixedMarket for Contract {
     }
     #[storage(read, write)]
     fn claim_expired_loan_req(loan_id: u64) {
+        require(!is_protocol_paused(), Error::EProtocolPaused);
         let mut loan = storage.loans.get(loan_id).read();
         require(loan.status == 0, Error::EInvalidStatus);
         require(
-            timestamp() > loan.created_timestamp + TIME_REQUEST_LOAN_GETS_EXPIRED,
+            timestamp() > loan.created_timestamp + get_req_expire_duration(),
             Error::ELoanReqNotExpired,
         );
         require(
@@ -314,10 +356,11 @@ impl FixedMarket for Contract {
     }
     #[payable, storage(read, write)]
     fn fill_loan_request(loan_id: u64) {
+        require(!is_protocol_paused(), Error::EProtocolPaused);
         let mut loan = storage.loans.get(loan_id).read();
         require(loan.status == 0, Error::EInvalidStatus);
         require(
-            loan.created_timestamp + TIME_REQUEST_LOAN_GETS_EXPIRED > timestamp(),
+            loan.created_timestamp + get_req_expire_duration() > timestamp(),
             Error::EAlreadyExpired,
         );
         loan.lender = get_caller_address();
@@ -342,11 +385,12 @@ impl FixedMarket for Contract {
     }
     #[payable, storage(read, write)]
     fn repay_loan(loan_id: u64) {
+        require(!is_protocol_paused(), Error::EProtocolPaused);
         let mut loan = storage.loans.get(loan_id).read();
         // loan must be active
         require(loan.status == 2, Error::EInvalidStatus);
         let interest_in_amount: u64 = loan.repayment_amount - loan.asset_amount;
-        let protocol_fee: u64 = (interest_in_amount * PROTOCOL_FEE) / 10000;
+        let protocol_fee: u64 = (interest_in_amount * get_protocol_fee()) / 10000;
         let amount_to_lender: u64 = loan.repayment_amount - protocol_fee;
         // status is 3 i.e repaid ref (enum at interface)
         loan.status = 3;
@@ -365,7 +409,7 @@ impl FixedMarket for Contract {
             collateral_asset_id,
             loan.collateral_amount,
         );
-        let protocol_fee_receiver_identity = Identity::Address(PROTOCOL_FEE_RECEIVER);
+        let protocol_fee_receiver_identity = Identity::Address(get_protocol_fee_receiver());
         transfer(protocol_fee_receiver_identity, asset_id, protocol_fee);
         log(LoanRepaidEvent {
             loan_id,
@@ -377,14 +421,15 @@ impl FixedMarket for Contract {
     }
     #[storage(read, write)]
     fn liquidate_loan(loan_id: u64) {
+        require(!is_protocol_paused(), Error::EProtocolPaused);
         let mut loan = storage.loans.get(loan_id).read();
         // loan must be active
         require(loan.status == 2, Error::EInvalidStatus);
         let can_loan_be_liquidated = can_liquidate_loan(loan_id);
         if (can_loan_be_liquidated) {
             // check for underflow? or edge cases
-            let protocol_fee = (loan.collateral_amount * PROTOCOL_LIQUIDATION_FEE) / 10000;
-            let liquidator_amount = (loan.collateral_amount * LIQUIDATOR_FEE) / 10000;
+            let protocol_fee = (loan.collateral_amount * get_protocol_liq_fee()) / 10000;
+            let liquidator_amount = (loan.collateral_amount * get_liquidator_fee()) / 10000;
             let lender_amount = loan.collateral_amount - liquidator_amount - protocol_fee;
             loan.status = 4;
             storage.loans.insert(loan_id, loan);
@@ -397,7 +442,7 @@ impl FixedMarket for Contract {
                 collateral_asset_id,
                 liquidator_amount,
             );
-            let protocol_fee_receiver_identity: Identity = get_identity_from_address(PROTOCOL_FEE_RECEIVER);
+            let protocol_fee_receiver_identity: Identity = get_identity_from_address(get_protocol_fee_receiver());
             transfer(
                 protocol_fee_receiver_identity,
                 collateral_asset_id,
@@ -457,6 +502,14 @@ impl FixedMarket for Contract {
     fn is_loan_liquidation_by_oracle(loan_id: u64) -> bool {
         storage.loans.get(loan_id).read().liquidation.liquidation_flag_internal
     }
+    #[storage(read)]
+    fn protocol_status() -> bool {
+        is_protocol_paused()
+    }
+    #[storage(read)]
+    fn protocol_config() -> ProtocolConfig {
+        storage.protocol_config.read()
+    }
 }
 fn get_caller_address() -> Address {
     match msg_sender().unwrap() {
@@ -469,6 +522,39 @@ fn get_asset_id_from_b256(asset: b256) -> AssetId {
 }
 fn get_identity_from_address(addr: Address) -> Identity {
     Identity::Address(addr)
+}
+
+#[storage(read)]
+fn is_protocol_paused() -> bool {
+    storage.is_paused.read()
+}
+
+#[storage(read)]
+fn get_req_expire_duration() -> u64 {
+    storage.protocol_config.time_request_loan_expires.read()
+}
+
+#[storage(read)]
+fn get_protocol_fee_receiver() -> Address {
+    storage.protocol_config.protocol_fee_receiver.read()
+}
+
+#[storage(read)]
+fn get_protocol_fee() -> u64 {
+    storage.protocol_config.protocol_fee.read()
+}
+#[storage(read)]
+fn get_protocol_liq_fee() -> u64 {
+    storage.protocol_config.protocol_liquidation_fee.read()
+}
+#[storage(read)]
+fn get_liquidator_fee() -> u64 {
+    storage.protocol_config.liquidator_fee.read()
+}
+
+#[storage(read)]
+fn get_oracle_max_stale() -> u64 {
+    storage.protocol_config.oracle_max_stale.read()
 }
 
 #[storage(read)]
@@ -557,13 +643,13 @@ fn get_price_from_oracle_internal(feed_id: PriceFeedId) -> u64 {
     if (oracle_result.publish_time > timestamp()) {
         let time_elapsed_in_seconds = oracle_result.publish_time - timestamp();
         require(
-            time_elapsed_in_seconds < MAX_STALENESS_SECONDS,
+            time_elapsed_in_seconds < get_oracle_max_stale(),
             Error::EOraclePriceStale,
         );
     } else {
         let time_elapsed_in_seconds = timestamp() - oracle_result.publish_time;
         require(
-            time_elapsed_in_seconds < MAX_STALENESS_SECONDS,
+            time_elapsed_in_seconds < get_oracle_max_stale(),
             Error::EOraclePriceStale,
         );
     }

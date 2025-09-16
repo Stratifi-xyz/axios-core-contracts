@@ -30,6 +30,27 @@ pub struct Loan {
     pub status: u64,
     pub liquidation: Liquidation,
 }
+
+pub struct ProtocolConfig {
+    pub protocol_fee_receiver: Address,
+    pub protocol_fee: u64,
+    pub protocol_liquidation_fee: u64,
+    pub liquidator_fee: u64,
+    pub time_request_loan_expires: u64,
+    pub oracle_max_stale: u64,
+}
+impl ProtocolConfig {
+    pub fn default() -> Self {
+        ProtocolConfig {
+            protocol_fee_receiver: Address::zero(),
+            protocol_fee: 1000,
+            protocol_liquidation_fee: 100,
+            liquidator_fee: 100,
+            time_request_loan_expires: 28800,
+            oracle_max_stale: 30,
+        }
+    }
+}
 pub enum Error {
     EMsgSenderAndBorrowerNotSame: (),
     EMsgSenderAndLenderNotSame: (),
@@ -53,6 +74,10 @@ pub enum Error {
     EOraclePriceStale: (),
     ENotEnoughForOracleUpdate: (),
     ENotOracleBaseAssetId: (),
+    ENotProtocolOwner: (),
+    ENotProtocolAdmin: (),
+    EProtocolConfigNotSet: (),
+    EProtocolPaused: (),
 }
 
 abi FixedMarket {
@@ -92,6 +117,17 @@ abi FixedMarket {
     fn get_loan_length() -> u64;
     #[storage(read)]
     fn is_loan_liquidation_by_oracle(loan_id: u64) -> bool;
+    #[storage(read)]
+    fn protocol_status() -> bool;
+    #[storage(read)]
+    fn protocol_config() -> ProtocolConfig;
+    // protocol config
+    #[storage(read, write)]
+    fn add_admin(admin: Address);
+    #[storage(read, write)]
+    fn update_protocol_config(config: ProtocolConfig);
+    #[storage(read, write)]
+    fn update_protocol_status(flag: bool);
 }
 
 // Only for query of decimals
