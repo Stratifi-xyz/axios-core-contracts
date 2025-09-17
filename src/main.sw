@@ -106,8 +106,11 @@ impl FixedMarket for Contract {
                 .asset_amount,
             Error::EAmountLessThanOrEqualToRepaymentAmount,
         );
-        // TODO: To restrict the granular orders of 1 seconds or 60 seconds. Should add minimum duration check. Indexer might dos?
-        require(loan_info.duration > 0, Error::EInvalidDuration);
+        require(
+            loan_info
+                .duration > get_min_loan_duration(),
+            Error::EInvalidDuration,
+        );
         require(
             loan_info
                 .asset != loan_info
@@ -158,6 +161,7 @@ impl FixedMarket for Contract {
             collateral: loan_info.collateral,
             collateral_amount: loan_info.collateral_amount,
             duration: loan_info.duration,
+            repayment_amount: loan_info.repayment_amount,
             liquidation: loan.liquidation.liquidation_flag_internal,
         });
     }
@@ -177,8 +181,11 @@ impl FixedMarket for Contract {
                 .asset_amount,
             Error::EAmountLessThanOrEqualToRepaymentAmount,
         );
-        // TODO: To restrict the granular orders of 1 seconds or 60 seconds. Should add minimum duration check. Indexer might dos?
-        require(loan_info.duration > 0, Error::EInvalidDuration);
+        require(
+            loan_info
+                .duration > get_min_loan_duration(),
+            Error::EInvalidDuration,
+        );
         require(
             loan_info
                 .asset != loan_info
@@ -226,6 +233,7 @@ impl FixedMarket for Contract {
             collateral: loan_info.collateral,
             collateral_amount: loan_info.collateral_amount,
             duration: loan_info.duration,
+            repayment_amount: loan_info.repayment_amount,
             liquidation: loan.liquidation.liquidation_flag_internal,
         });
     }
@@ -579,6 +587,11 @@ fn get_liquidator_fee() -> u64 {
 #[storage(read)]
 fn get_oracle_max_stale() -> u64 {
     storage.protocol_config.oracle_max_stale.read()
+}
+
+#[storage(read)]
+fn get_min_loan_duration() -> u64 {
+    storage.protocol_config.min_loan_duration.read()
 }
 
 #[storage(read)]

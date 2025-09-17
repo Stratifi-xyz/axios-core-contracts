@@ -38,16 +38,18 @@ pub struct ProtocolConfig {
     pub liquidator_fee: u64,
     pub time_request_loan_expires: u64,
     pub oracle_max_stale: u64,
+    pub min_loan_duration: u64,
 }
 impl ProtocolConfig {
     pub fn default() -> Self {
         ProtocolConfig {
             protocol_fee_receiver: Address::zero(),
-            protocol_fee: 1000,
+            protocol_fee: 0,
             protocol_liquidation_fee: 100,
             liquidator_fee: 100,
             time_request_loan_expires: 28800,
             oracle_max_stale: 30,
+            min_loan_duration: 600,
         }
     }
 }

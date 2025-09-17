@@ -41,6 +41,7 @@ pub struct LoanRequestedEvent {
     pub collateral: b256,
     pub collateral_amount: u64,
     pub duration: u64,
+    pub repayment_amount: u64,
     pub liquidation: bool,
 }
 pub struct LoanOfferedEvent {
@@ -51,6 +52,7 @@ pub struct LoanOfferedEvent {
     pub collateral: b256,
     pub collateral_amount: u64,
     pub duration: u64,
+    pub repayment_amount: u64,
     pub liquidation: bool,
 }
 
