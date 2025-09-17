@@ -1,0 +1,27 @@
+{
+  "name": "axios-core-contracts",
+  "version": "1.0.0",
+  "description": "",
+  "main": "deploy.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "deploy": "ts-node ./deploy.ts",
+    "format": "prettier --write ./deploy.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.14.0",
+  "dependencies": {
+    "dotenv": "^17.2.2",
+    "fs-extra": "^11.3.2",
+    "fuels": "0.101.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^24.5.1",
+    "prettier": "^3.6.2"
+  }
+}
