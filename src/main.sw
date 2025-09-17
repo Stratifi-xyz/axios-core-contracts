@@ -4,7 +4,6 @@ mod interface;
 use interface::{Error, FixedMarket, Loan, ProtocolConfig, SRC20, Status};
 
 use events::*;
-
 use pyth_interface::{data_structures::price::{Price, PriceFeedId}, PythCore};
 use std::auth::msg_sender;
 use std::block::timestamp;
@@ -23,6 +22,7 @@ storage {
     loans: StorageMap<u64, Loan> = StorageMap {},
     loan_length: u64 = 0,
     pyth_contract: ContractId = ContractId::zero(),
+    stork_contract: Address = Address::zero(),
     // (base_asset_id, quote_asset_id) -> PythFeedId
     // eg map of (eth, usdc) -> PythFeedId (underlying type is b256)
     oracle_config: StorageMap<(b256, b256), PriceFeedId> = StorageMap {},
@@ -31,6 +31,30 @@ storage {
     is_paused: bool = true,
 }
 impl FixedMarket for Contract {
+    #[storage(read, write)]
+    fn update_oracle_contract(addr: b256) {
+        require(
+            storage
+                .protocol_admin
+                .read() == get_caller_address(),
+            Error::ENotProtocolAdmin,
+        );
+        storage.stork_contract.write(addr.into());
+    }
+
+    #[storage(read, write)]
+    fn update_oracle_feed_id(base_asset_id: b256, quote_asset_id: b256, feed_id: b256) {
+        require(
+            storage
+                .protocol_admin
+                .read() == get_caller_address(),
+            Error::ENotProtocolAdmin,
+        );
+        storage
+            .oracle_config
+            .insert((base_asset_id, quote_asset_id), feed_id);
+    }
+
     #[storage(read, write)]
     fn add_admin(admin: Address) {
         require(

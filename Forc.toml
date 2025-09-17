@@ -7,4 +7,3 @@ name = "axios-fuel-core"
 
 [dependencies]
 pyth_interface = { git = "https://github.com/pyth-network/pyth-crosschain", rev = "9f26ac575ddf116aa48d1b2367c4e6512d5e34cb" }
-

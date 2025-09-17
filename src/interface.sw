@@ -128,6 +128,12 @@ abi FixedMarket {
     fn update_protocol_config(config: ProtocolConfig);
     #[storage(read, write)]
     fn update_protocol_status(flag: bool);
+
+    // oracle config
+    #[storage(read, write)]
+    fn update_oracle_contract(addr: b256);
+    #[storage(read, write)]
+    fn update_oracle_feed_id(base_asset_id: b256, quote_asset_id: b256, feed_id: b256);
 }
 
 // Only for query of decimals
