@@ -542,6 +542,14 @@ impl FixedMarket for Contract {
     fn protocol_config() -> ProtocolConfig {
         storage.protocol_config.read()
     }
+
+    fn get_protocol_owner() -> Address {
+        PROTOCOL_OWNER
+    }
+    #[storage(read)]
+    fn get_protocol_admin() -> Address {
+        storage.protocol_admin.read()
+    }
 }
 fn get_caller_address() -> Address {
     match msg_sender().unwrap() {

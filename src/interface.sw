@@ -105,11 +105,13 @@ abi FixedMarket {
     fn cancel_lender_offer(loan_id: u64);
     #[storage(read, write)]
     fn claim_expired_loan_offer(loan_id: u64);
+
     // oracle
     #[payable, storage(read)]
     fn pay_and_update_price_feeds(update_data: Vec<Bytes>);
     #[storage(read)]
     fn get_price_from_oracle(feed_id: PriceFeedId) -> u64;
+
     // Storage Read Function
     #[storage(read)]
     fn get_loan(loan_id: u64) -> Loan;
@@ -123,6 +125,11 @@ abi FixedMarket {
     fn protocol_status() -> bool;
     #[storage(read)]
     fn protocol_config() -> ProtocolConfig;
+
+    fn get_protocol_owner() -> Address;
+    #[storage(read)]
+    fn get_protocol_admin() -> Address;
+
     // protocol config
     #[storage(read, write)]
     fn add_admin(admin: Address);
