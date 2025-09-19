@@ -33,23 +33,13 @@ storage {
 impl FixedMarket for Contract {
     #[storage(read, write)]
     fn update_oracle_contract(addr: b256) {
-        require(
-            storage
-                .protocol_admin
-                .read() == get_caller_address(),
-            Error::ENotProtocolAdmin,
-        );
+        only_protocol_admin();
         storage.stork_contract.write(addr.into());
     }
 
     #[storage(read, write)]
     fn update_oracle_feed_id(base_asset_id: b256, quote_asset_id: b256, feed_id: b256) {
-        require(
-            storage
-                .protocol_admin
-                .read() == get_caller_address(),
-            Error::ENotProtocolAdmin,
-        );
+        only_protocol_admin();
         storage
             .oracle_config
             .insert((base_asset_id, quote_asset_id), feed_id);
@@ -57,31 +47,18 @@ impl FixedMarket for Contract {
 
     #[storage(read, write)]
     fn add_admin(admin: Address) {
-        require(
-            PROTOCOL_OWNER == get_caller_address(),
-            Error::ENotProtocolOwner,
-        );
+        only_protocol_owner();
         storage.protocol_admin.write(admin);
     }
     #[storage(read, write)]
     fn update_protocol_config(config: ProtocolConfig) {
-        require(
-            storage
-                .protocol_admin
-                .read() == get_caller_address(),
-            Error::ENotProtocolAdmin,
-        );
+        only_protocol_admin();
         storage.protocol_config.write(config);
     }
 
     #[storage(read, write)]
     fn update_protocol_status(flag: bool) {
-        require(
-            storage
-                .protocol_admin
-                .read() == get_caller_address(),
-            Error::ENotProtocolAdmin,
-        );
+        only_protocol_admin();
         require(
             storage
                 .protocol_config
@@ -557,11 +534,32 @@ fn get_caller_address() -> Address {
         _ => revert(0),
     }
 }
+fn get_caller_identity() -> Identity {
+    msg_sender().unwrap()
+}
 fn get_asset_id_from_b256(asset: b256) -> AssetId {
     AssetId::from(asset)
 }
 fn get_identity_from_address(addr: Address) -> Identity {
     Identity::Address(addr)
+}
+
+#[storage(read)]
+fn only_protocol_owner() {
+    require(
+        Identity::Address(PROTOCOL_OWNER) == msg_sender()
+            .unwrap(),
+        Error::ENotProtocolOwner,
+    );
+}
+
+#[storage(read)]
+fn only_protocol_admin() {
+    require(
+        Identity::Address(storage.protocol_admin.read()) == msg_sender()
+            .unwrap(),
+        Error::ENotProtocolAdmin,
+    );
 }
 
 #[storage(read)]

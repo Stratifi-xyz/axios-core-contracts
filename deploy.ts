@@ -4,6 +4,7 @@ import {
   WalletUnlocked,
   ContractFactory,
   hexlify,
+  Contract,
 } from 'fuels';
 import fs from 'fs-extra';
 import dotenv from 'dotenv';
@@ -49,11 +50,84 @@ async function main() {
 
     const tx = await factory.deploy();
     const response = await tx.waitForResult();
-
     console.log('Contract Id: ', response.contract.id.toString());
+    console.log(
+      `-------------------------------------------------------------`,
+    );
+    const protocolAdminWallet = getProtocolAdminWallet();
+    console.log(`Protocol Admin Wallet: ${protocolAdminWallet.address}`);
+    await addProtocolAdmin(
+      response.contract,
+      getProtocolAdminWallet(),
+      protocolOwnerWallet,
+    );
   } catch (error) {
     console.error(error);
   }
+}
+
+async function addProtocolAdmin(
+  contract: Contract,
+  protocolAdminWallet: WalletUnlocked,
+  protocolOwnerWallet: WalletUnlocked,
+) {
+  contract.account = protocolOwnerWallet;
+  const provider = await getProviderForTestnet();
+  protocolOwnerWallet.connect(provider);
+  const tx = await contract.functions
+    .add_admin({
+      bits: protocolAdminWallet.address.toB256(),
+    })
+    .call();
+  console.log(tx);
+  console.log(
+    '---------------------------------------debug----------------------------------',
+  );
+  const { waitForResult } = await contract.functions
+    .get_protocol_admin()
+    .call();
+  const { value } = await waitForResult();
+  console.log(value);
+  console.log(
+    '---------------------------------------debug----------------------------------',
+  );
+}
+
+function getContractFactory(wallet: WalletUnlocked): ContractFactory<Contract> {
+  const bytecode = fs.readFileSync('./out/debug/axios-fuel-core.bin');
+  const bytecodeHex = hexlify(bytecode);
+
+  const abi = fs.readJsonSync('./out/debug/axios-fuel-core-abi.json');
+  const factory = new ContractFactory(bytecodeHex, abi, wallet);
+  return factory;
+}
+
+async function getProviderForTestnet(): Promise<Provider> {
+  const provider = await new Provider(
+    'https://testnet.fuel.network/v1/graphql',
+  );
+  return provider;
+}
+
+function getProtocolDeployerWallet(): WalletUnlocked {
+  const protocolDeployer = process.env.PROTOCOL_DEPLOYER!;
+  const protocolDeployerWallet: WalletUnlocked =
+    Wallet.fromMnemonic(protocolDeployer);
+  return protocolDeployerWallet;
+}
+
+function getProtocolOwnerWallet(): WalletUnlocked {
+  const protocolOwner = process.env.PROTOCOL_OWNER!;
+  const protocolOwnerWallet: WalletUnlocked =
+    Wallet.fromMnemonic(protocolOwner);
+  return protocolOwnerWallet;
+}
+
+function getProtocolAdminWallet(): WalletUnlocked {
+  const protocolAdmin = process.env.PROTOCOL_ADMIN!;
+  const protocolAdminWallet: WalletUnlocked =
+    Wallet.fromMnemonic(protocolAdmin);
+  return protocolAdminWallet;
 }
 
 main();
