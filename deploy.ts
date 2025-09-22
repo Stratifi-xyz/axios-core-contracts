@@ -61,6 +61,10 @@ async function main() {
       getProtocolAdminWallet(),
       protocolOwnerWallet,
     );
+    await updateProtocolConfigByAdmin(
+      response.contract,
+      getProtocolAdminWallet(),
+    );
   } catch (error) {
     console.error(error);
   }
@@ -79,20 +83,31 @@ async function addProtocolAdmin(
       bits: protocolAdminWallet.address.toB256(),
     })
     .call();
-  console.log(tx);
-  console.log(
-    '---------------------------------------debug----------------------------------',
-  );
-  const { waitForResult } = await contract.functions
-    .get_protocol_admin()
-    .call();
-  const { value } = await waitForResult();
-  console.log(value);
   console.log(
     '---------------------------------------debug----------------------------------',
   );
 }
-
+async function updateProtocolConfigByAdmin(
+  contract: Contract,
+  protocolAdminWallet: WalletUnlocked,
+) {
+  contract.account = protocolAdminWallet;
+  const provider = await getProviderForTestnet();
+  protocolAdminWallet.connect(provider);
+  console.log(`printf:1`);
+  const tx = await contract.functions
+    .update_protocol_config({
+      protocol_fee_receiver: { bits: protocolAdminWallet.address.toB256() },
+      protocol_fee: 100,
+      protocol_liquidation_fee: 100,
+      liquidator_fee: 100,
+      time_request_loan_expires: 28800,
+      oracle_max_stale: 30,
+      min_loan_duration: 600,
+    })
+    .call();
+  console.log(tx);
+}
 function getContractFactory(wallet: WalletUnlocked): ContractFactory<Contract> {
   const bytecode = fs.readFileSync('./out/debug/axios-fuel-core.bin');
   const bytecodeHex = hexlify(bytecode);
